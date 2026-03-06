@@ -5,6 +5,29 @@
     padding: 0;
 }
 
+@font-face {
+    font-family: 'titulo';
+    src: url('/fonts/poppins.bold.ttf') format(truetype);
+}
+
+@font-face {
+    font-family: 'texto';
+    src: url('/fonts/open-sans.regular.ttf') format(truetype);
+}
+
 :root {
-    
+    --cor0: #EEEFFB;
+    --cor1: #C7D2FE;
+    --cor2: #6366F1;
+    --cor3: #3730A3;
+    --cor4: #1E1B4B;
+}
+
+body {
+    background: var(--cor0);
+}
+
+
+header {
+    background-color: var(--cor4);
 }
