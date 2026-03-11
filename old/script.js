@@ -274,7 +274,7 @@ estilosJS.textContent = `
     display: block;
     width: 24px;
     height: 2px;
-    background: #C9A0A8;
+    background: #C7D2FE;
     border-radius: 2px;
     transition: all 0.3s ease;
   }
@@ -291,7 +291,7 @@ estilosJS.textContent = `
       top: 100%;
       left: 0;
       right: 0;
-      background: #29030D;
+      background: #1E1B4B;
       flex-direction: column;
       padding: 1rem;
       gap: 0.25rem;
@@ -345,7 +345,7 @@ estilosJS.textContent = `
     right: 2rem;
     width: 44px;
     height: 44px;
-    background: linear-gradient(135deg, #431222, #29030D);
+    background: linear-gradient(135deg, #6366F1, #3730A3);
     color: white;
     border: none;
     border-radius: 50%;
@@ -355,7 +355,7 @@ estilosJS.textContent = `
     pointer-events: none;
     transform: translateY(12px);
     transition: opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: 0 4px 16px rgba(67, 18, 34, 0.4);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
     z-index: 200;
   }
   .btn-topo.visivel {
@@ -364,7 +364,7 @@ estilosJS.textContent = `
     transform: translateY(0);
   }
   .btn-topo:hover {
-    box-shadow: 0 8px 24px rgba(67, 18, 34, 0.55);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.55);
     transform: translateY(-3px);
   }
 
