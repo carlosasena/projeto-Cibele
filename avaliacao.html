@@ -116,30 +116,26 @@
                 </ul>
             </div>
 
-            <form action="enviar-avaliacao.php" method="post" id="form-avaliacao">
+            <form action="enviar-avaliacao.php" method="post">
                 <div class="campo-form">
                     <label for="nome">Nome completo *</label>
                     <input type="text" id="nome" name="nome" placeholder="Seu nome completo" required>
                 </div>
-
                 <div class="campo-form">
                     <label for="email">E-mail *</label>
                     <input type="email" id="email" name="email" placeholder="seu@email.com" required>
                 </div>
-
                 <div class="campo-form">
-                    <label for="telefone">Telefone / WhatsApp *</label>
-                    <input type="tel" id="telefone" name="telefone" placeholder="+55 (00) 00000-0000" required>
+                    <label for="telefone">Telefone / WhatsApp</label>
+                    <input type="tel" id="telefone" name="telefone" placeholder="+55 (00) 00000-0000">
                 </div>
-
                 <div class="campo-form">
-                    <label for="pais">País de destino *</label>
-                    <input type="text" id="pais" name="pais" placeholder="Ex: Estados Unidos, Portugal, Itália" required>
+                    <label for="pais">País de destino</label>
+                    <input type="text" id="pais" name="pais" placeholder="Ex: Estados Unidos, Portugal, Itália">
                 </div>
-
                 <div class="campo-form">
-                    <label for="visto">Tipo de visto desejado *</label>
-                    <select id="visto" name="visto" required>
+                    <label for="visto">Tipo de visto desejado</label>
+                    <select id="visto" name="visto">
                         <option value="">Selecione uma opção</option>
                         <option value="b1b2">Turismo – B1/B2 (EUA)</option>
                         <option value="f1">Estudante – F1 (EUA)</option>
@@ -151,12 +147,10 @@
                         <option value="outro">Outro / Não sei</option>
                     </select>
                 </div>
-
                 <div class="campo-form">
                     <label for="mensagem">Mensagem (opcional)</label>
                     <textarea id="mensagem" name="mensagem" placeholder="Conte um pouco sobre sua situação, objetivos e principais dúvidas..."></textarea>
                 </div>
-
                 <button type="submit" class="btn btn-primario btn-grande">Enviar Avaliação</button>
             </form>
         </section>
