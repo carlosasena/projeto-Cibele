@@ -1,38 +1,32 @@
 <?php
 // =============================================
-// enviar-avaliacao.php
-// Processa o formulário de avaliação - Versão Locaweb
+// enviar-avaliacao.php - Versão com SMTP Locaweb
 // =============================================
 
-// Configurações de erro (desative em produção)
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
+// Carrega o PHPMailer
+require_once 'PHPMailer/PHPMailer.php';
+require_once 'PHPMailer/SMTP.php';
+require_once 'PHPMailer/Exception.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 // =============================================
-// CONFIGURAÇÕES DO SISTEMA
+// CONFIGURAÇÕES - ALTERE AQUI
 // =============================================
 
-// Domínio da hospedagem (ALTERE PARA SEU DOMÍNIO)
-$dominio = "visaepassaporte.com.br";
+// Dados do seu e-mail no domínio (precisa existir)
+$email_smtp = "noreply@visaepassaporte.com.br";  // E-mail que vai enviar
+$senha_smtp = "SUA_SENHA_AQUI";                  // Senha do e-mail
+$nome_smtp  = "Visa & Passaporte Consultoria";
 
-// E-mails
-$email_destino   = "cibelealencar@visaepassaporte.com.br";
-$email_remetente = "noreply@{$dominio}";
-$nome_remetente  = "Visa & Passaporte Consultoria";
-$assunto_base    = "Nova Avaliação de Perfil – Visa & Passaporte";
-
-// Quebra de linha para Linux (Locaweb)
-$quebra_linha = "\n";
+// E-mail que vai RECEBER
+$email_destino = "cibelealencar@visaepassaporte.com.br";
 
 // =============================================
-// FUNÇÕES AUXILIARES
-// =============================================
 
-/**
- * Redireciona com status
- */
-function redirecionar($status, $campo = '')
-{
+// Função para redirecionar
+function redirecionar($status, $campo = '') {
     $url = "avaliacao.html?status=" . $status;
     if ($campo) {
         $url .= "&campo=" . $campo;
@@ -41,11 +35,13 @@ function redirecionar($status, $campo = '')
     exit;
 }
 
-/**
- * Sanitiza dados do formulário
- */
-function limpar($valor)
-{
+// Só aceita POST
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    redirecionar("erro_metodo");
+}
+
+// Sanitiza dados
+function limpar($valor) {
     if ($valor === null || $valor === '') {
         return '';
     }
@@ -55,49 +51,6 @@ function limpar($valor)
     return $valor;
 }
 
-/**
- * Salva backup em CSV
- */
-function salvarBackup($nome, $email, $telefone, $pais, $visto, $mensagem)
-{
-    $backup_dir = __DIR__ . '/_backup_avaliacoes';
-    if (!is_dir($backup_dir)) {
-        mkdir($backup_dir, 0755, true);
-    }
-
-    $arquivo_csv = $backup_dir . '/avaliacoes_' . date('Y-m-d') . '.csv';
-    $existe = file_exists($arquivo_csv);
-
-    if (!$existe) {
-        $cabecalho = "Data;Nome;Email;Telefone;Pais Destino;Tipo Visto;Mensagem;IP\n";
-        file_put_contents($arquivo_csv, $cabecalho, FILE_APPEND);
-    }
-
-    $dados = [
-        date('Y-m-d H:i:s'),
-        str_replace(';', ',', $nome),
-        $email,
-        $telefone,
-        $pais,
-        $visto,
-        str_replace(["\n", "\r", ";"], ' ', substr($mensagem, 0, 200)),
-        $_SERVER['REMOTE_ADDR'] ?? 'Não identificado'
-    ];
-
-    $linha = implode(';', $dados) . "\n";
-    file_put_contents($arquivo_csv, $linha, FILE_APPEND);
-}
-
-// =============================================
-// VALIDAÇÃO DO FORMULÁRIO
-// =============================================
-
-// Só aceita POST
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    redirecionar("erro_metodo");
-}
-
-// Coleta os dados
 $nome     = limpar($_POST["nome"] ?? "");
 $email    = limpar($_POST["email"] ?? "");
 $telefone = limpar($_POST["telefone"] ?? "");
@@ -105,20 +58,12 @@ $pais     = limpar($_POST["pais"] ?? "");
 $visto    = limpar($_POST["visto"] ?? "");
 $mensagem = limpar($_POST["mensagem"] ?? "");
 
-// Validações obrigatórias
-if (empty($nome)) {
-    redirecionar("erro", "nome");
-}
+// Validação
+if (empty($nome)) redirecionar("erro", "nome");
+if (empty($email)) redirecionar("erro", "email");
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) redirecionar("erro", "email_invalido");
 
-if (empty($email)) {
-    redirecionar("erro", "email");
-}
-
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    redirecionar("erro", "email_invalido");
-}
-
-// Campos opcionais com valor padrão
+// Valores padrão
 $telefone = empty($telefone) ? "Não informado" : $telefone;
 $pais     = empty($pais) ? "Não informado" : $pais;
 $mensagem = empty($mensagem) ? "Não informada" : $mensagem;
@@ -134,207 +79,147 @@ $tipos_visto = [
     'familiar'  => 'Reagrupamento Familiar',
     'outro'     => 'Outro / Não sei'
 ];
-
 $visto_exibicao = $tipos_visto[$visto] ?? $visto;
 
 // =============================================
 // CORPO DO E-MAIL
 // =============================================
 
-$assunto = "{$assunto_base} – {$nome}";
+$assunto = "Nova Avaliação de Perfil – Visa & Passaporte – {$nome}";
 
-// Corpo em HTML
-$corpo_html = '<!DOCTYPE html>
+$corpo_html = "
+<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+    <meta charset='UTF-8'>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: #431222;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-        }
-        .content {
-            background: #f9f4f5;
-            padding: 20px;
-            border: 1px solid #c9a0a8;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-        }
-        .field {
-            margin-bottom: 15px;
-        }
-        .field-label {
-            font-weight: bold;
-            color: #431222;
-            margin-bottom: 5px;
-        }
-        .field-value {
-            background: white;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ede6e7;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 12px;
-            color: #696566;
-        }
-        hr {
-            border: none;
-            border-top: 1px solid #c9a0a8;
-            margin: 20px 0;
-        }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #431222; color: white; padding: 20px; text-align: center; }
+        .content { background: #f9f4f5; padding: 20px; border: 1px solid #c9a0a8; }
+        .field { margin-bottom: 15px; }
+        .field-label { font-weight: bold; color: #431222; }
+        .field-value { background: white; padding: 10px; border-radius: 4px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #696566; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+    <div class='container'>
+        <div class='header'>
             <h2>Nova Avaliação de Perfil</h2>
             <p>Visa & Passaporte Consultoria</p>
         </div>
-        <div class="content">
-            <div class="field">
-                <div class="field-label">Nome completo:</div>
-                <div class="field-value">' . htmlspecialchars($nome) . '</div>
+        <div class='content'>
+            <div class='field'>
+                <div class='field-label'>Nome completo:</div>
+                <div class='field-value'>" . htmlspecialchars($nome) . "</div>
             </div>
-            <div class="field">
-                <div class="field-label">E-mail:</div>
-                <div class="field-value">' . htmlspecialchars($email) . '</div>
+            <div class='field'>
+                <div class='field-label'>E-mail:</div>
+                <div class='field-value'>" . htmlspecialchars($email) . "</div>
             </div>
-            <div class="field">
-                <div class="field-label">Telefone/WhatsApp:</div>
-                <div class="field-value">' . htmlspecialchars($telefone) . '</div>
+            <div class='field'>
+                <div class='field-label'>Telefone/WhatsApp:</div>
+                <div class='field-value'>" . htmlspecialchars($telefone) . "</div>
             </div>
-            <div class="field">
-                <div class="field-label">País de destino:</div>
-                <div class="field-value">' . htmlspecialchars($pais) . '</div>
+            <div class='field'>
+                <div class='field-label'>País de destino:</div>
+                <div class='field-value'>" . htmlspecialchars($pais) . "</div>
             </div>
-            <div class="field">
-                <div class="field-label">Tipo de visto:</div>
-                <div class="field-value">' . htmlspecialchars($visto_exibicao) . '</div>
+            <div class='field'>
+                <div class='field-label'>Tipo de visto:</div>
+                <div class='field-value'>" . htmlspecialchars($visto_exibicao) . "</div>
             </div>
-            <div class="field">
-                <div class="field-label">Mensagem:</div>
-                <div class="field-value">' . nl2br(htmlspecialchars($mensagem)) . '</div>
+            <div class='field'>
+                <div class='field-label'>Mensagem:</div>
+                <div class='field-value'>" . nl2br(htmlspecialchars($mensagem)) . "</div>
             </div>
             <hr>
-            <div class="field">
-                <div class="field-label">Recebido em:</div>
-                <div class="field-value">' . date("d/m/Y H:i:s") . '</div>
+            <div class='field'>
+                <div class='field-label'>Recebido em:</div>
+                <div class='field-value'>" . date("d/m/Y H:i:s") . "</div>
             </div>
         </div>
-        <div class="footer">
+        <div class='footer'>
             <p>E-mail enviado automaticamente pelo sistema Visa & Passaporte.</p>
         </div>
     </div>
 </body>
-</html>';
-
-// Corpo em texto plano (fallback)
-$corpo_texto = "Nova avaliação de perfil recebida pelo site.\n\n";
-$corpo_texto .= "============================================\n";
-$corpo_texto .= "DADOS DO SOLICITANTE\n";
-$corpo_texto .= "============================================\n";
-$corpo_texto .= "Nome completo:      $nome\n";
-$corpo_texto .= "E-mail:             $email\n";
-$corpo_texto .= "Telefone/WhatsApp:  $telefone\n";
-$corpo_texto .= "País de destino:    $pais\n";
-$corpo_texto .= "Tipo de visto:      $visto_exibicao\n\n";
-$corpo_texto .= "MENSAGEM:\n";
-$corpo_texto .= "$mensagem\n\n";
-$corpo_texto .= "============================================\n";
-$corpo_texto .= "Recebido em: " . date("d/m/Y H:i:s") . "\n";
-$corpo_texto .= "IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'Não identificado') . "\n";
+</html>
+";
 
 // =============================================
-// HEADERS PARA LOCAWEB
+// ENVIO VIA SMTP
 // =============================================
 
-$headers = "MIME-Version: 1.0{$quebra_linha}";
-$headers .= "Content-type: text/html; charset=UTF-8{$quebra_linha}";
-$headers .= "From: {$nome_remetente} <{$email_remetente}>{$quebra_linha}";
-$headers .= "Reply-To: {$nome} <{$email}>{$quebra_linha}";
-$headers .= "Return-Path: {$email_remetente}{$quebra_linha}";
-$headers .= "X-Mailer: PHP/" . phpversion() . $quebra_linha;
-$headers .= "X-Priority: 3{$quebra_linha}";
-
-// Parâmetro -r obrigatório na Locaweb
-$parametros_extra = "-r{$email_remetente}";
-
-// =============================================
-// TENTATIVA DE ENVIO
-// =============================================
-
+$mail = new PHPMailer(true);
 $enviado = false;
 
-if (function_exists('mail')) {
-    // Tenta enviar com HTML
-    $enviado = mail($email_destino, $assunto, $corpo_html, $headers, $parametros_extra);
+try {
+    // Configuração do servidor SMTP da Locaweb
+    $mail->isSMTP();
+    $mail->Host       = 'smtp.visaepassaporte.com.br';  // SMTP da Locaweb
+    $mail->SMTPAuth   = true;
+    $mail->Username   = $email_smtp;
+    $mail->Password   = $senha_smtp;
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port       = 587;
 
-    // Se falhar, tenta com texto plano
-    if (!$enviado) {
-        $headers_texto = "MIME-Version: 1.0{$quebra_linha}";
-        $headers_texto .= "Content-type: text/plain; charset=UTF-8{$quebra_linha}";
-        $headers_texto .= "From: {$nome_remetente} <{$email_remetente}>{$quebra_linha}";
-        $headers_texto .= "Reply-To: {$nome} <{$email}>{$quebra_linha}";
-        $headers_texto .= "Return-Path: {$email_remetente}{$quebra_linha}";
+    // Remetente e destinatário
+    $mail->setFrom($email_smtp, $nome_smtp);
+    $mail->addAddress($email_destino);
+    $mail->addReplyTo($email, $nome);
 
-        $enviado = mail($email_destino, $assunto, $corpo_texto, $headers_texto, $parametros_extra);
-    }
+    // Conteúdo
+    $mail->isHTML(true);
+    $mail->Subject = $assunto;
+    $mail->Body    = $corpo_html;
+    $mail->AltBody = strip_tags($corpo_html);
 
-    if ($enviado) {
-        // Salva backup
-        salvarBackup($nome, $email, $telefone, $pais, $visto_exibicao, $mensagem);
-        redirecionar("sucesso");
-    } else {
-        error_log("[VisaPassaporte] Erro no envio: " . print_r(error_get_last(), true));
-    }
+    $mail->send();
+    $enviado = true;
+    
+    // Salva backup
+    salvarBackup($nome, $email, $telefone, $pais, $visto_exibicao, $mensagem);
+    redirecionar("sucesso");
+    
+} catch (Exception $e) {
+    // Erro no envio - salva backup
+    error_log("Erro PHPMailer: " . $mail->ErrorInfo);
+    salvarBackup($nome, $email, $telefone, $pais, $visto_exibicao, $mensagem);
+    redirecionar("sucesso");  // Mesmo com erro, salva backup e mostra sucesso
 }
 
 // =============================================
-// FALLBACK - SALVA EM ARQUIVO
+// FUNÇÃO DE BACKUP
 // =============================================
 
-if (!$enviado) {
+function salvarBackup($nome, $email, $telefone, $pais, $visto, $mensagem) {
     $backup_dir = __DIR__ . '/_backup_avaliacoes';
     if (!is_dir($backup_dir)) {
         mkdir($backup_dir, 0755, true);
     }
-
-    $arquivo = $backup_dir . '/avaliacao_' . date('Y-m-d_H-i-s') . '_' . uniqid() . '.html';
-    $conteudo = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset='UTF-8'>\n<title>Avaliação - {$nome}</title>\n</head>\n<body>\n";
-    $conteudo .= "<h2>Nova Avaliação de Perfil</h2>\n";
-    $conteudo .= "<p><strong>Data:</strong> " . date("d/m/Y H:i:s") . "</p>\n";
-    $conteudo .= "<p><strong>Nome:</strong> {$nome}</p>\n";
-    $conteudo .= "<p><strong>E-mail:</strong> {$email}</p>\n";
-    $conteudo .= "<p><strong>Telefone:</strong> {$telefone}</p>\n";
-    $conteudo .= "<p><strong>País de destino:</strong> {$pais}</p>\n";
-    $conteudo .= "<p><strong>Tipo de visto:</strong> {$visto_exibicao}</p>\n";
-    $conteudo .= "<p><strong>Mensagem:</strong><br>" . nl2br(htmlspecialchars($mensagem)) . "</p>\n";
-    $conteudo .= "</body>\n</html>";
-
-    if (file_put_contents($arquivo, $conteudo)) {
-        salvarBackup($nome, $email, $telefone, $pais, $visto_exibicao, $mensagem);
-        redirecionar("sucesso");
-    } else {
-        redirecionar("erro_fatal");
+    
+    $arquivo_csv = $backup_dir . '/avaliacoes_' . date('Y-m-d') . '.csv';
+    $existe = file_exists($arquivo_csv);
+    
+    if (!$existe) {
+        $cabecalho = "Data;Nome;Email;Telefone;Pais Destino;Tipo Visto;Mensagem;IP\n";
+        file_put_contents($arquivo_csv, $cabecalho, FILE_APPEND);
     }
+    
+    $dados = [
+        date('Y-m-d H:i:s'),
+        str_replace(';', ',', $nome),
+        $email,
+        $telefone,
+        $pais,
+        $visto,
+        str_replace(["\n", "\r", ";"], ' ', substr($mensagem, 0, 200)),
+        $_SERVER['REMOTE_ADDR'] ?? 'Não identificado'
+    ];
+    
+    $linha = implode(';', $dados) . "\n";
+    file_put_contents($arquivo_csv, $linha, FILE_APPEND);
 }
-
-// Se chegou até aqui, erro fatal
-redirecionar("erro_fatal");
 ?>
