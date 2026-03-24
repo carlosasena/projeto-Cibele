@@ -341,3 +341,68 @@ estilosJS.textContent = `
     }
 `;
 document.head.appendChild(estilosJS);
+
+// =============================================
+// VALIDAÇÃO EXTRA DO FORMULÁRIO
+// =============================================
+
+// Garante que o formulário de avaliação tenha validação robusta
+const formAvaliacao = document.getElementById('form-avaliacao');
+
+if (formAvaliacao) {
+    // Remove qualquer event listener anterior
+    const novoForm = formAvaliacao.cloneNode(true);
+    formAvaliacao.parentNode.replaceChild(novoForm, formAvaliacao);
+
+    novoForm.addEventListener('submit', function(e) {
+        let valido = true;
+        const camposObrigatorios = novoForm.querySelectorAll('[required]');
+
+        camposObrigatorios.forEach(campo => {
+            const campoForm = campo.closest('.campo-form');
+            const msgErroAntiga = campoForm?.querySelector('.msg-erro');
+
+            if (msgErroAntiga) {
+                msgErroAntiga.remove();
+            }
+
+            campo.classList.remove('erro', 'valido');
+
+            if (!campo.value.trim()) {
+                valido = false;
+                campo.classList.add('erro');
+
+                const msgErro = document.createElement('span');
+                msgErro.className = 'msg-erro';
+                msgErro.textContent = 'Este campo é obrigatório.';
+                campoForm?.appendChild(msgErro);
+            } else if (campo.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(campo.value)) {
+                valido = false;
+                campo.classList.add('erro');
+
+                const msgErro = document.createElement('span');
+                msgErro.className = 'msg-erro';
+                msgErro.textContent = 'Informe um e-mail válido.';
+                campoForm?.appendChild(msgErro);
+            } else {
+                campo.classList.add('valido');
+            }
+        });
+
+        if (!valido) {
+            e.preventDefault();
+
+            // Scroll para o primeiro erro
+            const primeiroErro = novoForm.querySelector('.erro');
+            if (primeiroErro) {
+                primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        } else {
+            const submitBtn = novoForm.querySelector('[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando...';
+            }
+        }
+    });
+}
