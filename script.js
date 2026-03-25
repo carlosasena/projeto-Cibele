@@ -1,9 +1,11 @@
+'use strict';
+
 document.addEventListener('DOMContentLoaded', () => {
 
     /* -----------------------------------------------
        1. NAV ATIVO — marca o link da página atual
     ----------------------------------------------- */
-    const navLinks = document.querySelectorAll('header nav a');
+    const navLinks   = document.querySelectorAll('header nav a');
     const paginaAtual = window.location.pathname.split('/').pop() || 'index.html';
 
     navLinks.forEach(link => {
@@ -14,16 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* -----------------------------------------------
-       2. HEADER — scroll sombra dinâmica
+       2. HEADER — sombra dinâmica no scroll
     ----------------------------------------------- */
     const header = document.querySelector('header');
     if (header) {
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 20) {
-                header.style.boxShadow = '0 4px 30px rgba(0,0,0,0.4)';
-            } else {
-                header.style.boxShadow = '0 2px 20px rgba(0,0,0,0.25)';
-            }
+            header.style.boxShadow = window.scrollY > 20
+                ? '0 4px 30px rgba(0,0,0,0.4)'
+                : '0 2px 20px rgba(0,0,0,0.25)';
         }, { passive: true });
     }
 
@@ -38,8 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry, i) => {
                 if (entry.isIntersecting) {
-                    const delay = (i % 6) * 80;
-                    entry.target.style.transitionDelay = `${delay}ms`;
+                    entry.target.style.transitionDelay = `${(i % 6) * 80}ms`;
                     entry.target.classList.add('visivel');
                     observer.unobserve(entry.target);
                 }
@@ -62,23 +61,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnMenu = document.createElement('button');
         btnMenu.className = 'btn-menu';
         btnMenu.setAttribute('aria-label', 'Abrir menu');
-        btnMenu.innerHTML = `
-            <span></span>
-            <span></span>
-            <span></span>
-        `;
+        btnMenu.setAttribute('aria-expanded', 'false');
+        btnMenu.innerHTML = '<span></span><span></span><span></span>';
         header.appendChild(btnMenu);
 
         btnMenu.addEventListener('click', () => {
             const aberto = nav.classList.toggle('nav-aberta');
-            btnMenu.classList.toggle('ativo');
-            btnMenu.setAttribute('aria-label', aberto ? 'Fechar menu' : 'Abrir menu');
+            btnMenu.classList.toggle('ativo', aberto);
+            btnMenu.setAttribute('aria-label',    aberto ? 'Fechar menu' : 'Abrir menu');
+            btnMenu.setAttribute('aria-expanded', aberto ? 'true'        : 'false');
         });
 
         navLinks.forEach(link => {
             link.addEventListener('click', () => {
                 nav.classList.remove('nav-aberta');
                 btnMenu.classList.remove('ativo');
+                btnMenu.setAttribute('aria-expanded', 'false');
             });
         });
 
@@ -86,19 +84,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!header.contains(e.target)) {
                 nav.classList.remove('nav-aberta');
                 btnMenu.classList.remove('ativo');
+                btnMenu.setAttribute('aria-expanded', 'false');
             }
         });
     }
 
     /* -----------------------------------------------
        5. FORMULÁRIO — validação e feedback visual
+       Funciona com o form#form-avaliacao em avaliacao.html
     ----------------------------------------------- */
-    const form = document.querySelector('form');
+    const form = document.getElementById('form-avaliacao') || document.querySelector('form');
+
     if (form) {
         const camposObrigatorios = form.querySelectorAll('[required]');
 
+        // Validação em tempo real (blur e input)
         camposObrigatorios.forEach(campo => {
-            campo.addEventListener('blur', () => validarCampo(campo));
+            campo.addEventListener('blur',  () => validarCampo(campo));
             campo.addEventListener('input', () => {
                 if (campo.classList.contains('erro')) validarCampo(campo);
             });
@@ -106,41 +108,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function validarCampo(campo) {
             const campoForm = campo.closest('.campo-form');
-            removerErro(campoForm);
+            if (!campoForm) return true;
+
+            removerMensagemErro(campoForm);
+            campo.classList.remove('erro', 'valido');
 
             if (!campo.value.trim()) {
-                mostrarErro(campoForm, 'Este campo é obrigatório.');
+                mostrarErro(campoForm, campo, 'Este campo é obrigatório.');
                 return false;
             }
 
             if (campo.type === 'email') {
                 const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(campo.value);
                 if (!emailValido) {
-                    mostrarErro(campoForm, 'Informe um e-mail válido.');
+                    mostrarErro(campoForm, campo, 'Informe um e-mail válido.');
                     return false;
                 }
             }
 
-            campo.classList.remove('erro');
             campo.classList.add('valido');
             return true;
         }
 
-        function mostrarErro(campoForm, msg) {
-            const input = campoForm.querySelector('input, select, textarea');
+        function mostrarErro(campoForm, input, msg) {
             input.classList.add('erro');
-            input.classList.remove('valido');
-
             let msgEl = campoForm.querySelector('.msg-erro');
             if (!msgEl) {
                 msgEl = document.createElement('span');
                 msgEl.className = 'msg-erro';
+                msgEl.setAttribute('role', 'alert');
                 campoForm.appendChild(msgEl);
             }
             msgEl.textContent = msg;
         }
 
-        function removerErro(campoForm) {
+        function removerMensagemErro(campoForm) {
             const msgEl = campoForm.querySelector('.msg-erro');
             if (msgEl) msgEl.remove();
         }
@@ -153,12 +155,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!validarCampo(campo)) valido = false;
             });
 
-            if (valido) {
-                const btnSubmit = form.querySelector('[type="submit"]');
-                btnSubmit.disabled = true;
-                btnSubmit.textContent = 'Enviando...';
-                form.submit(); // Envia realmente para o PHP
+            if (!valido) {
+                const primeiroErro = form.querySelector('.erro');
+                if (primeiroErro) {
+                    primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    primeiroErro.focus();
+                }
+                return;
             }
+
+            const btnSubmit = form.querySelector('[type="submit"]');
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.textContent = 'Enviando…';
+            }
+
+            form.submit();
         });
     }
 
@@ -185,11 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(btnTopo);
 
     window.addEventListener('scroll', () => {
-        if (window.scrollY > 400) {
-            btnTopo.classList.add('visivel');
-        } else {
-            btnTopo.classList.remove('visivel');
-        }
+        btnTopo.classList.toggle('visivel', window.scrollY > 400);
     }, { passive: true });
 
     btnTopo.addEventListener('click', () => {
@@ -203,26 +211,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (spanAno) spanAno.textContent = new Date().getFullYear();
 
     /* -----------------------------------------------
-       9. STATUS DO FORMULÁRIO PHP
+       9. STATUS DO FORMULÁRIO PHP (avaliacao.html)
     ----------------------------------------------- */
     const params = new URLSearchParams(window.location.search);
     const status = params.get('status');
-    const aviso = document.getElementById('aviso-form');
+    const aviso  = document.getElementById('aviso-form');
 
-    if (aviso && status === 'sucesso') {
-        aviso.innerHTML = `<span>✅</span><div><strong>Avaliação enviada com sucesso!</strong><p>Entraremos em contato em breve.</p></div>`;
-        aviso.className = 'aviso-form aviso-sucesso';
-        aviso.style.display = 'flex';
-        aviso.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        window.history.replaceState({}, '', 'avaliacao.html');
-    }
-
-    if (aviso && status === 'erro') {
-        aviso.innerHTML = `<span>⚠️</span><div><strong>Erro ao enviar.</strong><p>Tente novamente ou entre em contato pelo WhatsApp.</p></div>`;
-        aviso.className = 'aviso-form aviso-erro';
-        aviso.style.display = 'flex';
-        aviso.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        window.history.replaceState({}, '', 'avaliacao.html');
+    if (aviso) {
+        if (status === 'sucesso') {
+            aviso.innerHTML   = '<span>✅</span><div><strong>Avaliação enviada com sucesso!</strong><p>Entraremos em contato em breve.</p></div>';
+            aviso.className   = 'aviso-form aviso-sucesso';
+            aviso.style.display = 'flex';
+            aviso.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.history.replaceState({}, '', 'avaliacao.html');
+        } else if (status === 'erro' || status === 'erro_fatal') {
+            aviso.innerHTML   = '<span>⚠️</span><div><strong>Erro ao enviar.</strong><p>Tente novamente ou entre em contato pelo WhatsApp.</p></div>';
+            aviso.className   = 'aviso-form aviso-erro';
+            aviso.style.display = 'flex';
+            aviso.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.history.replaceState({}, '', 'avaliacao.html');
+        }
     }
 
 });
@@ -287,9 +295,8 @@ estilosJS.textContent = `
             z-index: 99;
         }
         header nav.nav-aberta { display: flex; }
-        header nav a { padding: 0.75rem 1rem; font-size: 1rem; }
-
-        header { position: relative; flex-wrap: wrap; }
+        header nav a          { padding: 0.75rem 1rem; font-size: 1rem; }
+        header                { position: relative; flex-wrap: wrap; }
     }
 
     /* --- Validação de formulário --- */
@@ -305,9 +312,10 @@ estilosJS.textContent = `
         border-color: #10B981;
     }
     .msg-erro {
+        display: block;
         font-size: 0.82rem;
         color: #EF4444;
-        margin-top: 2px;
+        margin-top: 3px;
     }
 
     /* --- Botão voltar ao topo --- */
@@ -341,68 +349,3 @@ estilosJS.textContent = `
     }
 `;
 document.head.appendChild(estilosJS);
-
-// =============================================
-// VALIDAÇÃO EXTRA DO FORMULÁRIO
-// =============================================
-
-// Garante que o formulário de avaliação tenha validação robusta
-const formAvaliacao = document.getElementById('form-avaliacao');
-
-if (formAvaliacao) {
-    // Remove qualquer event listener anterior
-    const novoForm = formAvaliacao.cloneNode(true);
-    formAvaliacao.parentNode.replaceChild(novoForm, formAvaliacao);
-
-    novoForm.addEventListener('submit', function(e) {
-        let valido = true;
-        const camposObrigatorios = novoForm.querySelectorAll('[required]');
-
-        camposObrigatorios.forEach(campo => {
-            const campoForm = campo.closest('.campo-form');
-            const msgErroAntiga = campoForm?.querySelector('.msg-erro');
-
-            if (msgErroAntiga) {
-                msgErroAntiga.remove();
-            }
-
-            campo.classList.remove('erro', 'valido');
-
-            if (!campo.value.trim()) {
-                valido = false;
-                campo.classList.add('erro');
-
-                const msgErro = document.createElement('span');
-                msgErro.className = 'msg-erro';
-                msgErro.textContent = 'Este campo é obrigatório.';
-                campoForm?.appendChild(msgErro);
-            } else if (campo.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(campo.value)) {
-                valido = false;
-                campo.classList.add('erro');
-
-                const msgErro = document.createElement('span');
-                msgErro.className = 'msg-erro';
-                msgErro.textContent = 'Informe um e-mail válido.';
-                campoForm?.appendChild(msgErro);
-            } else {
-                campo.classList.add('valido');
-            }
-        });
-
-        if (!valido) {
-            e.preventDefault();
-
-            // Scroll para o primeiro erro
-            const primeiroErro = novoForm.querySelector('.erro');
-            if (primeiroErro) {
-                primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        } else {
-            const submitBtn = novoForm.querySelector('[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Enviando...';
-            }
-        }
-    });
-}
